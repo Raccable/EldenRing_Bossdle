@@ -19,7 +19,7 @@ function getESTNow() {
   return new Date(estString);
 }
 
-const startDate = new Date('2025-10-17T00:00:00-05:00');
+const startDate = new Date('2025-10-17T00:00:00-04:00');
 
 function daysSinceStart() {
   const estNow = getESTNow();
