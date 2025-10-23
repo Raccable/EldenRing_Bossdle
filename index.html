@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Elden Ring: Bossdle — Elden Ring Boss Wordle</title>
+<link rel="stylesheet" href="style.css" />
+<link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+
+<style>
+  footer small {
+    font-size: 1.1rem; /* Bigger text */
+  }
+
+  footer small a {
+    color: #ff69b4; /* Pink link */
+    text-decoration: none;
+  }
+
+  footer small a:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+<main class="container">
+  <h1>Elden Ring: Bossdle</h1>
+  <p id="today-date" class="subtitle"></p>
+  <p class="subtitle">Guess the Elden Ring boss. Feedback shows matching attributes.</p>
+
+  <section id="game">
+    <div id="grid" aria-live="polite"></div>
+
+    <div id="controls">
+      <input id="guess-input" list="bosses-list" placeholder="Type boss name..." autocomplete="off" />
+      <datalist id="bosses-list"></datalist>
+      <button id="guess-btn">Guess</button>
+    </div>
+
+    <div id="feedback"></div>
+
+    <div id="stats">
+      <div>Streak: <span id="streak">0</span></div>
+      <div>Wins: <span id="wins">0</span></div>
+      <div>Played: <span id="played">0</span></div>
+    </div>
+
+    <div id="answer-reveal" class="hidden">
+      Answer: <span id="answer-name"></span>
+    </div>
+  </section>
+
+  <footer>
+    <small>Data: Elden Ring Wiki. Built for <a href="https://twitch.tv/jordanxap" target="_blank">JordanxAP</a>.</small>
+  </footer>
+</main>
+
+<!-- Win Overlay -->
+<div id="win-overlay" class="hidden">
+  <div id="win-content">
+    <button id="win-close">✕</button>
+    <h2 id="overlay-title">You Win!</h2>
+    <div id="overlay-text"></div>
+    <p id="overlay-countdown"></p>
+    <button id="overlay-share">Share</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
