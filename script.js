@@ -13,24 +13,20 @@ let testMode = false;
 let countdownInterval = null;
 
 // ---------------- Time & Seeded Random ----------------
-// Calculate EST "now" without string round-trip, using UTC math
-function getESTNow() {
-  const now = new Date();
-  // UTC time in milliseconds
-  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
-  // EST/EDT offset is -4 hours from UTC
-  const estOffsetMs = -4 * 60 * 60 * 1000;
-  return new Date(utcMs + estOffsetMs);
-}
-
-// Start date in EST
+// Start date in EST (midnight EST)
 const startDate = new Date('2025-10-17T00:00:00-04:00');
 
+// Days since start, synced to EST midnight
 function daysSinceStart() {
-  const now = getESTNow();
-  // diff in milliseconds
-  const diffMs = now.getTime() - startDate.getTime();
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24)) + testDayOffset;
+  const nowUtc = new Date();
+  const rawDays = Math.floor((nowUtc - startDate) / (1000 * 60 * 60 * 24));
+
+  // EST midnight is 04:00 UTC
+  const estMidnightTodayUtc = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 4, 0, 0, 0));
+  if (nowUtc.getTime() < estMidnightTodayUtc.getTime()) {
+    return rawDays - 1 + testDayOffset;
+  }
+  return rawDays + testDayOffset;
 }
 
 function seededRandom(seed) {
@@ -322,15 +318,23 @@ function showWinOverlay(win, fromStorage = false) {
 }
 
 // ---------------- Countdown Timer ----------------
+function getNextESTMidnightUTC() {
+  const nowUtc = new Date();
+  const estMidnightTodayUtc = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 4, 0, 0, 0));
+  if (nowUtc.getTime() >= estMidnightTodayUtc.getTime()) {
+    return new Date(estMidnightTodayUtc.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return estMidnightTodayUtc;
+}
+
 function startCountdownTimer() {
   if (countdownInterval) clearInterval(countdownInterval);
 
   function updateCountdown() {
-    const now = getESTNow();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0);
+    const nowUtc = new Date();
+    const nextMidnight = getNextESTMidnightUTC();
 
-    const diff = midnight - now;
+    const diff = nextMidnight - nowUtc;
     if (diff <= 0) {
       countdownEl.textContent = 'A new Bossdle is available!';
       clearInterval(countdownInterval);
