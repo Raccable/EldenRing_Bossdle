@@ -13,12 +13,14 @@ let testMode = false;
 let countdownInterval = null;
 
 // ---------------- Time & Seeded Random ----------------
+// Always get EST "now" for day calculation
 function getESTNow() {
   const now = new Date();
   const estString = now.toLocaleString("en-US", { timeZone: "America/New_York" });
   return new Date(estString);
 }
 
+// Start date in EST
 const startDate = new Date('2025-10-17T00:00:00-04:00');
 
 function daysSinceStart() {
@@ -42,9 +44,23 @@ function getBossOfTheDay() {
   return bosses[index];
 }
 
+// ---------------- Utilities ----------------
 function pad(num, size) {
   let s = "000" + num;
   return s.substr(s.length - size);
+}
+
+function bossEmojiRow(boss) {
+  return ['name', 'region', 'type', 'damage', 'Remembrance'].map(attr => {
+    return boss[attr] === target[attr] ? '🟩' : '⬛';
+  }).join('');
+}
+
+function copyResults(win) {
+  const num = daysSinceStart();
+  const header = `Bossdle ${pad(num + 1, 3)} ${win ? attempts.length : 'X'}/${GRID_SIZE}\n`;
+  const gridStr = attempts.map(a => bossEmojiRow(a)).join('\n');
+  navigator.clipboard.writeText(header + gridStr).then(() => alert('Copied to clipboard!'));
 }
 
 // ---------------- DOM Elements ----------------
@@ -65,13 +81,10 @@ fetch('bosses.json')
     bosses = data;
     populateDatalist();
 
-    // Check for new day first (daily reset if needed)
     checkForNewDay();
 
-    // Load previous attempts only if daily reset didn't wipe them
     attempts = JSON.parse(localStorage.getItem(ATTEMPTS_KEY) || '[]');
 
-    // Ensure target is set
     if (!target) target = getBossOfTheDay();
 
     initializeGame();
@@ -114,7 +127,6 @@ function initializeGame() {
   gridEl.innerHTML = '';
   makeHeaderRow();
 
-  // Draw previous guesses
   attempts.forEach(a => drawGridRow(a, false));
 
   const guessedCorrectly = attempts.some(a => a.name === target?.name);
@@ -130,7 +142,7 @@ function initializeGame() {
     answerRevealEl.classList.remove('hidden');
     showWinOverlay(false, true);
   } else if (attempts.length === 0) {
-    addEmptyRow(); // ✅ first load empty row
+    addEmptyRow();
   } else {
     const lastRow = gridEl.querySelector('.guess-row:last-child');
     if (lastRow && ![...lastRow.children].some(cell => cell.textContent.includes('—'))) {
@@ -333,20 +345,7 @@ function startCountdownTimer() {
   countdownInterval = setInterval(updateCountdown, 1000);
 }
 
-// ---------------- Utilities ----------------
-function bossEmojiRow(boss) {
-  return ['name', 'region', 'type', 'damage', 'Remembrance'].map(attr => {
-    return boss[attr] === target[attr] ? '🟩' : '⬛';
-  }).join('');
-}
-
-function copyResults(win) {
-  const num = daysSinceStart();
-  const header = `Bossdle ${pad(num + 1, 3)} ${win ? attempts.length : 'X'}/${GRID_SIZE}\n`;
-  const gridStr = attempts.map(a => bossEmojiRow(a)).join('\n');
-  navigator.clipboard.writeText(header + gridStr).then(() => alert('Copied to clipboard!'));
-}
-
+// ---------------- Bossdle Day Label ----------------
 function updateBossdleDayLabel() {
   const dayNum = daysSinceStart();
   bossdleDayEl.textContent = `Bossdle: ${pad(dayNum + 1, 3)}`;

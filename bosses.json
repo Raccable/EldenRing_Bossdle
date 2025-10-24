@@ -52,7 +52,7 @@
   {"name": "Grave Warden Duelist", "region": "Many", "type": "Catacombs", "damage": "Physical", "Remembrance": false},
   {"name": "Godrick the Grafted", "region": "Stormveil Castle", "type": "Shardbearer", "damage": "Fire", "Remembrance": true},
   {"name": "Rennala, Queen of the Full Moon", "region": "Raya Lucaria Academy", "type": "Shardbearer", "damage": "Magic", "Remembrance": true},
-  {"name": "Starscourge Radahn", "region": "Caelid", "type": "Shardbearer", "damage": "Gravity", "Remembrance": true},
+  {"name": "Starscourge Radahn", "region": "Caelid", "type": "Shardbearer", "damage": "Physical", "Remembrance": true},
   {"name": "Morgott, the Omen King", "region": "Leyndell, Royal Capital", "type": "Shardbearer", "damage": "Bleed", "Remembrance": true},
   {"name": "Malenia, Blade of Miquella", "region": "The Haligtree", "type": "Shardbearer", "damage": "Scarlet Rot", "Remembrance": true},
   {"name": "Maliketh Black Blade", "region": "Crumbling Farum Azula", "type": "Legend", "damage": "Holy", "Remembrance": true},
