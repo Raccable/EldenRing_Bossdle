@@ -13,11 +13,25 @@ let testMode = false;
 let countdownInterval = null;
 
 // ---------------- Time & Seeded Random ----------------
-// Always get EST "now" for day calculation
+// Always get EST "now" for day calculation without string round-trip
 function getESTNow() {
   const now = new Date();
-  const estString = now.toLocaleString("en-US", { timeZone: "America/New_York" });
-  return new Date(estString);
+
+  // Use Intl.DateTimeFormat to get EST components directly
+  const parts = new Intl.DateTimeFormat("en-US", { 
+    timeZone: "America/New_York",
+    year: "numeric", month: "numeric", day: "numeric",
+    hour: "numeric", minute: "numeric", second: "numeric",
+    hour12: false
+  }).formatToParts(now);
+
+  const obj = {};
+  for (const {type, value} of parts) {
+    if (type !== "literal") obj[type] = parseInt(value);
+  }
+
+  // Construct a Date object directly in local time from EST components
+  return new Date(obj.year, obj.month - 1, obj.day, obj.hour, obj.minute, obj.second);
 }
 
 // Start date in EST
