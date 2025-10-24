@@ -13,34 +13,24 @@ let testMode = false;
 let countdownInterval = null;
 
 // ---------------- Time & Seeded Random ----------------
-// Always get EST "now" for day calculation without string round-trip
+// Calculate EST "now" without string round-trip, using UTC math
 function getESTNow() {
   const now = new Date();
-
-  // Use Intl.DateTimeFormat to get EST components directly
-  const parts = new Intl.DateTimeFormat("en-US", { 
-    timeZone: "America/New_York",
-    year: "numeric", month: "numeric", day: "numeric",
-    hour: "numeric", minute: "numeric", second: "numeric",
-    hour12: false
-  }).formatToParts(now);
-
-  const obj = {};
-  for (const {type, value} of parts) {
-    if (type !== "literal") obj[type] = parseInt(value);
-  }
-
-  // Construct a Date object directly in local time from EST components
-  return new Date(obj.year, obj.month - 1, obj.day, obj.hour, obj.minute, obj.second);
+  // UTC time in milliseconds
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  // EST/EDT offset is -4 hours from UTC
+  const estOffsetMs = -4 * 60 * 60 * 1000;
+  return new Date(utcMs + estOffsetMs);
 }
 
 // Start date in EST
 const startDate = new Date('2025-10-17T00:00:00-04:00');
 
 function daysSinceStart() {
-  const estNow = getESTNow();
-  const diff = estNow - startDate;
-  return Math.floor(diff / (1000 * 60 * 60 * 24)) + testDayOffset;
+  const now = getESTNow();
+  // diff in milliseconds
+  const diffMs = now.getTime() - startDate.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24)) + testDayOffset;
 }
 
 function seededRandom(seed) {
@@ -336,12 +326,11 @@ function startCountdownTimer() {
   if (countdownInterval) clearInterval(countdownInterval);
 
   function updateCountdown() {
-    const estNow = getESTNow();
-    const estMidnight = new Date(estNow);
-    estMidnight.setHours(24, 0, 0, 0);
+    const now = getESTNow();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
 
-    const diff = estMidnight - estNow;
-
+    const diff = midnight - now;
     if (diff <= 0) {
       countdownEl.textContent = 'A new Bossdle is available!';
       clearInterval(countdownInterval);
