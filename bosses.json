@@ -38,7 +38,7 @@
   {"name": "Borealis the Freezing Fog", "region": "Mountaintops of the Giants", "type": "Dragon", "damage": "Scarlet Rot", "Remembrance": false},
   {"name": "Crucible Knight / Misbegotten Warrior", "region": "Caelid", "type": "Duo", "damage": "Holy", "Remembrance": false},
   {"name": "Crucible Knight Ordovis / Crucible Knight", "region": "Mt. Gelmir", "type": "Duo", "damage": "Holy", "Remembrance": false},
-  {"name": "Commander O'Neil", "region": "Caelid", "type": "Great Boss", "damage": "Rot", "Remembrance": false},
+  {"name": "Commander O'Neil", "region": "Caelid", "type": "Great Boss", "damage": "Scarlet Rot", "Remembrance": false},
   {"name": "Commander Neill", "region": "Mountaintops of the Giants", "type": "Great Boss", "damage": "Frost", "Remembrance": false},
   {"name": "Battlemage Hugues", "region": "Caelid", "type": "Evergaol", "damage": "Magic", "Remembrance": false},
   {"name": "Red Wolf of Radagon", "region": "Leyndell, Royal Capital", "type": "Raya Lucaria Boss", "damage": "Magic", "Remembrance": false},
