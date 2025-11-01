@@ -35,7 +35,7 @@
   {"name": "Fallingstar Beast(Cave)", "region": "Caelid", "type": "Cave", "damage": "Physical", "Remembrance": false},
   {"name": "Fallingstar Beast", "region": "Many", "type": "Field Boss", "damage": "Physical", "Remembrance": false},
   {"name": "Decaying Ekzykes", "region": "Caelid", "type": "Dragon", "damage": "Scarlet Rot", "Remembrance": false},
-  {"name": "Borealis the Freezing Fog", "region": "Mountaintops of the Giants", "type": "Dragon", "damage": "Scarlet Rot", "Remembrance": false},
+  {"name": "Borealis the Freezing Fog", "region": "Mountaintops of the Giants", "type": "Dragon", "damage": "Frost", "Remembrance": false},
   {"name": "Crucible Knight / Misbegotten Warrior", "region": "Caelid", "type": "Duo", "damage": "Holy", "Remembrance": false},
   {"name": "Crucible Knight Ordovis / Crucible Knight", "region": "Mt. Gelmir", "type": "Duo", "damage": "Holy", "Remembrance": false},
   {"name": "Commander O'Neil", "region": "Caelid", "type": "Great Boss", "damage": "Scarlet Rot", "Remembrance": false},
