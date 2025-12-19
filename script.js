@@ -12,21 +12,75 @@ let testDayOffset = 0;
 let testMode = false;
 let countdownInterval = null;
 
+// ---------------- Timezone Helpers (DST-safe) ----------------
+const EASTERN_TZ = 'America/New_York';
+
+// Returns "YYYY-MM-DD" for the given Date in America/New_York (handles DST correctly)
+function easternYMD(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: EASTERN_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  return `${y}-${m}-${d}`;
+}
+
+// Counts whole-day difference between two Eastern YMD strings
+function daysBetweenEastern(startYMD, endYMD) {
+  // Interpret YMD as UTC midnights solely for stable day counting (no DST issues)
+  const start = new Date(`${startYMD}T00:00:00Z`);
+  const end = new Date(`${endYMD}T00:00:00Z`);
+  return Math.floor((end - start) / 86400000);
+}
+
+// Converts an Eastern local wall-clock time (YYYY-MM-DD + HH:MM:SS) to a real UTC Date
+function easternWallTimeToUTC(ymd, hh = 0, mm = 0, ss = 0) {
+  // Step 1: Build a Date as if that wall time were UTC
+  const naiveUTC = new Date(Date.UTC(
+    parseInt(ymd.slice(0, 4), 10),
+    parseInt(ymd.slice(5, 7), 10) - 1,
+    parseInt(ymd.slice(8, 10), 10),
+    hh, mm, ss, 0
+  ));
+
+  // Step 2: Figure out what wall time that naiveUTC corresponds to in Eastern
+  const easternAtNaive = new Date(naiveUTC.toLocaleString('en-US', { timeZone: EASTERN_TZ }));
+
+  // Step 3: Offset between naive and "interpreted eastern" gives the correction to real UTC
+  const correctionMs = naiveUTC.getTime() - easternAtNaive.getTime();
+
+  // Step 4: Apply correction
+  return new Date(naiveUTC.getTime() + correctionMs);
+}
+
+// Next Eastern midnight, as a UTC Date (DST-safe)
+function getNextESTMidnightUTC() {
+  const now = new Date();
+
+  // tomorrow's date in Eastern
+  const nowEastern = new Date(now.toLocaleString('en-US', { timeZone: EASTERN_TZ }));
+  nowEastern.setDate(nowEastern.getDate() + 1);
+  const tomorrowYMD = easternYMD(nowEastern);
+
+  // Eastern midnight at start of tomorrow
+  return easternWallTimeToUTC(tomorrowYMD, 0, 0, 0);
+}
+
 // ---------------- Time & Seeded Random ----------------
-// Start date in EST (midnight EST)
+// Start date anchored to Eastern calendar day.
+// (Keeping your original startDate literal; day counting below is based on Eastern YMD.)
 const startDate = new Date('2025-10-17T00:00:00-04:00');
 
-// Days since start, synced to EST midnight
+// Days since start, synced to Eastern midnight (DST-safe)
 function daysSinceStart() {
-  const nowUtc = new Date();
-  const rawDays = Math.floor((nowUtc - startDate) / (1000 * 60 * 60 * 24));
-
-  // EST midnight is 04:00 UTC
-  const estMidnightTodayUtc = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 4, 0, 0, 0));
-  if (nowUtc.getTime() < estMidnightTodayUtc.getTime()) {
-    return rawDays - 1 + testDayOffset;
-  }
-  return rawDays + testDayOffset;
+  const startYMD = easternYMD(startDate);
+  const todayYMD = easternYMD(new Date());
+  return daysBetweenEastern(startYMD, todayYMD) + testDayOffset;
 }
 
 function seededRandom(seed) {
@@ -73,6 +127,13 @@ const answerRevealEl = document.getElementById('answer-reveal');
 const answerNameEl = document.getElementById('answer-name');
 const overlay = document.getElementById('win-overlay');
 const countdownEl = document.getElementById('overlay-countdown');
+
+// ---------------- Exploit Fix (Option 2) ----------------
+function setInputsEnabled(enabled) {
+  inputEl.disabled = !enabled;
+  btnEl.disabled = !enabled;
+  if (!enabled) inputEl.value = '';
+}
 
 // ---------------- Load Boss Data ----------------
 fetch('bosses.json')
@@ -133,17 +194,23 @@ function initializeGame() {
 
   if (guessedCorrectly) {
     gameOver = true;
+    setInputsEnabled(false); // ✅ lock
     removeEmptyRows();
     showWinOverlay(true, true);
   } else if (attempts.length >= GRID_SIZE) {
     gameOver = true;
+    setInputsEnabled(false); // ✅ lock
     removeEmptyRows();
     answerNameEl.textContent = target?.name || '';
     answerRevealEl.classList.remove('hidden');
     showWinOverlay(false, true);
   } else if (attempts.length === 0) {
+    gameOver = false;
+    setInputsEnabled(true); // ✅ allow play
     addEmptyRow();
   } else {
+    gameOver = false;
+    setInputsEnabled(true); // ✅ allow play
     const lastRow = gridEl.querySelector('.guess-row:last-child');
     if (lastRow && ![...lastRow.children].some(cell => cell.textContent.includes('—'))) {
       addEmptyRow();
@@ -164,6 +231,7 @@ function checkForNewDay() {
     localStorage.setItem(LAST_DATE_KEY, currentDay.toString());
     target = getBossOfTheDay();
     gameOver = false;
+    setInputsEnabled(true); // ✅ re-enable on new day
   }
 }
 
@@ -237,6 +305,9 @@ function drawGridRow(boss, save = true) {
 
 // ---------------- Guess Handling ----------------
 function handleGuess() {
+  // ✅ extra safety: if game is over, ignore guesses (even if someone triggers via console)
+  if (gameOver) return;
+
   const guess = inputEl.value.trim().toLowerCase();
   const boss = bosses.find(b => b.name.toLowerCase() === guess);
   if (!boss) {
@@ -254,6 +325,7 @@ function handleGuess() {
 
   if (boss.name === target.name) {
     gameOver = true;
+    setInputsEnabled(false); // ✅ lock on win
     saveStats(true);
     removeEmptyRows();
     showWinOverlay(true);
@@ -262,6 +334,7 @@ function handleGuess() {
 
   if (attempts.length >= GRID_SIZE) {
     gameOver = true;
+    setInputsEnabled(false); // ✅ lock on loss
     answerNameEl.textContent = target.name;
     answerRevealEl.classList.remove('hidden');
     saveStats(false);
@@ -293,7 +366,7 @@ function showWinOverlay(win, fromStorage = false) {
   else { title.classList.add('loss'); text.classList.add('loss'); }
 
   const rowsContent = attempts.map(a => bossEmojiRow(a)).join('<br>');
-  text.innerHTML = win 
+  text.innerHTML = win
     ? `You guessed <strong>${target.name}</strong>!<br>${rowsContent}`
     : `The boss was <strong>${target.name}</strong><br>${rowsContent}`;
 
@@ -318,15 +391,6 @@ function showWinOverlay(win, fromStorage = false) {
 }
 
 // ---------------- Countdown Timer ----------------
-function getNextESTMidnightUTC() {
-  const nowUtc = new Date();
-  const estMidnightTodayUtc = new Date(Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate(), 4, 0, 0, 0));
-  if (nowUtc.getTime() >= estMidnightTodayUtc.getTime()) {
-    return new Date(estMidnightTodayUtc.getTime() + 24 * 60 * 60 * 1000);
-  }
-  return estMidnightTodayUtc;
-}
-
 function startCountdownTimer() {
   if (countdownInterval) clearInterval(countdownInterval);
 
