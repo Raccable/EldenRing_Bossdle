@@ -1,6 +1,5 @@
 // ================================
-// Bossdle script.js (FINAL)
-// Eastern-midnight safe + exploit fix
+// Elden Ring: Bossdle — PRODUCTION
 // ================================
 
 // ---------------- Constants & Globals ----------------
@@ -13,59 +12,72 @@ let bosses = [];
 let target = null;
 let attempts = [];
 let gameOver = false;
-let testDayOffset = 0;
-let testMode = false;
 let countdownInterval = null;
 
-// ---------------- Time Helpers ----------------
-
-// Start date in EST
+// ---------------- Time Helpers (GLOBAL, CORRECT) ----------------
 const startDate = new Date('2025-10-17T00:00:00-04:00');
+const EASTERN_TZ = 'America/New_York';
 
-// Returns UTC hour for Eastern midnight (5 in winter, 4 in summer)
-function easternMidnightUtcHour() {
-  return new Date().getTimezoneOffset() / 60;
+function easternYMD(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: EASTERN_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+
+  const y = parts.find(p => p.type === 'year').value;
+  const m = parts.find(p => p.type === 'month').value;
+  const d = parts.find(p => p.type === 'day').value;
+  return `${y}-${m}-${d}`;
 }
 
-// Days since start, synced to Eastern midnight
+function daysBetweenYMD(startYMD, endYMD) {
+  const start = new Date(`${startYMD}T00:00:00Z`);
+  const end = new Date(`${endYMD}T00:00:00Z`);
+  return Math.floor((end - start) / 86400000);
+}
+
 function daysSinceStart() {
-  const nowUtc = new Date();
-  const rawDays = Math.floor((nowUtc - startDate) / 86400000);
-
-  const utcHour = easternMidnightUtcHour();
-  const estMidnightTodayUtc = new Date(
-    Date.UTC(
-      nowUtc.getUTCFullYear(),
-      nowUtc.getUTCMonth(),
-      nowUtc.getUTCDate(),
-      utcHour, 0, 0, 0
-    )
-  );
-
-  if (nowUtc < estMidnightTodayUtc) {
-    return rawDays - 1 + testDayOffset;
-  }
-  return rawDays + testDayOffset;
+  const startYMD = easternYMD(startDate);
+  const todayYMD = easternYMD(new Date());
+  return daysBetweenYMD(startYMD, todayYMD);
 }
 
-// Next Eastern midnight (UTC)
+function parseGmtOffsetToMinutes(gmtString) {
+  const m = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(gmtString);
+  if (!m) return 0;
+
+  const sign = m[1] === '-' ? -1 : 1;
+  const hours = parseInt(m[2], 10);
+  const mins = m[3] ? parseInt(m[3], 10) : 0;
+  return sign * (hours * 60 + mins);
+}
+
+function easternOffsetMinutesForYMD(y, m, d) {
+  const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: EASTERN_TZ,
+    timeZoneName: 'shortOffset',
+    hour: '2-digit'
+  }).formatToParts(probe);
+
+  const tz = parts.find(p => p.type === 'timeZoneName')?.value || 'GMT+0';
+  return parseGmtOffsetToMinutes(tz);
+}
+
+function easternMidnightUTCDate(y, m, d) {
+  const offsetMin = easternOffsetMinutesForYMD(y, m, d);
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - offsetMin * 60000);
+}
+
 function getNextESTMidnightUTC() {
-  const nowUtc = new Date();
-  const utcHour = easternMidnightUtcHour();
-
-  const estMidnightTodayUtc = new Date(
-    Date.UTC(
-      nowUtc.getUTCFullYear(),
-      nowUtc.getUTCMonth(),
-      nowUtc.getUTCDate(),
-      utcHour, 0, 0, 0
-    )
-  );
-
-  if (nowUtc >= estMidnightTodayUtc) {
-    return new Date(estMidnightTodayUtc.getTime() + 86400000);
-  }
-  return estMidnightTodayUtc;
+  const todayYMD = easternYMD(new Date());
+  const todayNoonUTC = new Date(`${todayYMD}T12:00:00Z`);
+  const tomorrowNoonUTC = new Date(todayNoonUTC.getTime() + 86400000);
+  const [y, m, d] = easternYMD(tomorrowNoonUTC).split('-').map(Number);
+  return easternMidnightUTCDate(y, m, d);
 }
 
 // ---------------- Seeded Random ----------------
@@ -112,7 +124,7 @@ const answerNameEl = document.getElementById('answer-name');
 const overlay = document.getElementById('win-overlay');
 const countdownEl = document.getElementById('overlay-countdown');
 
-// ---------------- Exploit Fix ----------------
+// ---------------- Input Lock ----------------
 function setInputsEnabled(enabled) {
   inputEl.disabled = !enabled;
   btnEl.disabled = !enabled;
@@ -132,6 +144,7 @@ fetch('bosses.json')
     startDailyCheck();
   });
 
+// ---------------- Datalist ----------------
 function populateDatalist() {
   const list = document.getElementById('bosses-list');
   bosses.forEach(b => {
@@ -150,79 +163,13 @@ function loadStats() {
 }
 
 function saveStats(win) {
-  if (testMode) return;
   const stats = JSON.parse(localStorage.getItem(STATS_KEY) || '{}');
   stats.played = (stats.played || 0) + 1;
   stats.wins = stats.wins || 0;
   stats.streak = stats.streak || 0;
-  if (win) {
-    stats.wins++;
-    stats.streak++;
-  } else {
-    stats.streak = 0;
-  }
+  win ? (stats.wins++, stats.streak++) : (stats.streak = 0);
   localStorage.setItem(STATS_KEY, JSON.stringify(stats));
   loadStats();
-}
-
-// ---------------- Game Init ----------------
-function initializeGame() {
-  loadStats();
-
-  gridEl.innerHTML = '';
-  overlay.classList.add('hidden');
-  answerRevealEl.classList.add('hidden');
-
-  makeHeaderRow();
-
-  // Restore previous guesses
-  attempts.forEach(a => drawGridRow(a, false));
-
-  const guessedCorrectly = attempts.some(a => a.name === target.name);
-
-  if (guessedCorrectly) {
-    gameOver = true;
-    setInputsEnabled(false);
-    showWinOverlay(true, true);
-  } 
-  else if (attempts.length >= GRID_SIZE) {
-    gameOver = true;
-    setInputsEnabled(false);
-    answerNameEl.textContent = target.name;
-    answerRevealEl.classList.remove('hidden');
-    showWinOverlay(false, true);
-  } 
-  else {
-    gameOver = false;
-    setInputsEnabled(true);
-
-    // ✅ only add ONE empty row
-    if (!gridEl.querySelector('.empty-row')) {
-      addEmptyRow();
-    }
-  }
-
-  feedbackEl.textContent = '';
-  updateBossdleDayLabel();
-}
-
-
-// ---------------- Daily Reset ----------------
-function checkForNewDay() {
-  const today = daysSinceStart();
-  const last = parseInt(localStorage.getItem(LAST_DATE_KEY) || '-1', 10);
-
-  if (today !== last || testMode) {
-    attempts = [];
-    localStorage.setItem(ATTEMPTS_KEY, '[]');
-    localStorage.setItem(LAST_DATE_KEY, today.toString());
-    target = getBossOfTheDay();
-    gameOver = false;
-    overlay.classList.add('hidden');
-    answerRevealEl.classList.add('hidden');
-    setInputsEnabled(true);
-    initializeGame();
-  }
 }
 
 // ---------------- Grid ----------------
@@ -239,23 +186,17 @@ function makeHeaderRow() {
 }
 
 function addEmptyRow() {
-  if (gameOver) return;
-
-  if (gridEl.querySelector('.empty-row')) return;
-
+  if (gameOver || gridEl.querySelector('.empty-row')) return;
   const row = document.createElement('div');
   row.className = 'guess-row empty-row';
-
   for (let i = 0; i < 5; i++) {
     const c = document.createElement('div');
     c.className = 'guess-cell bad';
     c.textContent = '—';
     row.appendChild(c);
   }
-
   gridEl.appendChild(row);
 }
-
 
 function drawGridRow(boss, save = true) {
   const row = document.createElement('div');
@@ -264,26 +205,13 @@ function drawGridRow(boss, save = true) {
   ['name', 'region', 'type', 'damage', 'Remembrance'].forEach(attr => {
     const c = document.createElement('div');
     c.className = 'guess-cell';
-
-    let displayValue = boss[attr];
-
-    // 🔥 Convert boolean → Yes / No (display only)
-    if (attr === 'Remembrance') {
-      displayValue = boss[attr] ? 'Yes' : 'No';
-    }
-
-    c.textContent = displayValue;
+    c.textContent = attr === 'Remembrance' ? (boss[attr] ? 'Yes' : 'No') : boss[attr];
     c.classList.add(boss[attr] === target[attr] ? 'good' : 'bad');
     row.appendChild(c);
   });
 
-  // Insert before empty row if it exists (keeps layout correct)
   const emptyRow = gridEl.querySelector('.empty-row');
-  if (emptyRow) {
-    gridEl.insertBefore(row, emptyRow);
-  } else {
-    gridEl.appendChild(row);
-  }
+  emptyRow ? gridEl.insertBefore(row, emptyRow) : gridEl.appendChild(row);
 
   if (save) {
     attempts.push(boss);
@@ -291,27 +219,50 @@ function drawGridRow(boss, save = true) {
   }
 }
 
+// ---------------- Init ----------------
+function initializeGame() {
+  loadStats();
+  gridEl.innerHTML = '';
+  overlay.classList.add('hidden');
+  answerRevealEl.classList.add('hidden');
 
+  makeHeaderRow();
+  attempts.forEach(a => drawGridRow(a, false));
 
-// ---------------- Guess Handling ----------------
+  const won = attempts.some(a => a.name === target.name);
+
+  if (won || attempts.length >= GRID_SIZE) {
+    gameOver = true;
+    setInputsEnabled(false);
+    if (!won) {
+      answerNameEl.textContent = target.name;
+      answerRevealEl.classList.remove('hidden');
+    }
+    showWinOverlay(won);
+  } else {
+    gameOver = false;
+    setInputsEnabled(true);
+    addEmptyRow();
+  }
+
+  feedbackEl.textContent = '';
+  updateBossdleDayLabel();
+}
+
+// ---------------- Guess ----------------
 function handleGuess() {
   if (gameOver) return;
 
   const guess = inputEl.value.trim().toLowerCase();
   const boss = bosses.find(b => b.name.toLowerCase() === guess);
 
-  if (!boss) {
-    feedbackEl.textContent = 'Not a valid boss name.';
-    return;
-  }
-  if (attempts.some(a => a.name === boss.name)) {
-    feedbackEl.textContent = 'Already guessed.';
+  if (!boss || attempts.some(a => a.name === boss.name)) {
+    feedbackEl.textContent = 'Invalid guess.';
     return;
   }
 
   drawGridRow(boss);
   inputEl.value = '';
-  feedbackEl.textContent = '';
 
   if (boss.name === target.name) {
     gameOver = true;
@@ -333,36 +284,23 @@ function handleGuess() {
 // ---------------- Overlay ----------------
 document.getElementById('win-close').onclick = () => overlay.classList.add('hidden');
 
-function showWinOverlay(win, fromStorage = false) {
+function showWinOverlay(win) {
   overlay.classList.remove('hidden');
-
   const title = document.getElementById('overlay-title');
   const text = document.getElementById('overlay-text');
   const shareBtn = document.getElementById('overlay-share');
 
-  // 🔥 RESET old classes
-  title.classList.remove('win', 'loss');
-  text.classList.remove('win', 'loss');
-
-  // 🔥 APPLY correct class
-  title.classList.add(win ? 'win' : 'loss');
-  text.classList.add(win ? 'win' : 'loss');
-
   title.textContent = win ? 'You Win!' : 'You Lose!';
+  title.className = win ? 'win' : 'loss';
 
-  const rowsContent = attempts.map(a => bossEmojiRow(a)).join('<br>');
+  const rows = attempts.map(bossEmojiRow).join('<br>');
+  text.innerHTML = win
+    ? `You guessed <strong>${target.name}</strong>!<br>${rows}`
+    : `The boss was <strong>${target.name}</strong><br>${rows}`;
 
-text.innerHTML = win
-  ? `You guessed <strong>${target.name}</strong>!<br>${rowsContent}`
-  : `The boss was <strong>${target.name}</strong><br>${rowsContent}`;
-
-
-  shareBtn.style.display = 'inline-block';
   shareBtn.onclick = () => copyResults(win);
-
   startCountdownTimer();
 }
-
 
 // ---------------- Countdown ----------------
 function startCountdownTimer() {
@@ -370,6 +308,7 @@ function startCountdownTimer() {
   countdownInterval = setInterval(() => {
     const diff = getNextESTMidnightUTC() - new Date();
     if (diff <= 0) return;
+
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
@@ -377,14 +316,30 @@ function startCountdownTimer() {
   }, 1000);
 }
 
-// ---------------- Label & Events ----------------
-function updateBossdleDayLabel() {
-  bossdleDayEl.textContent = `Bossdle: ${pad(daysSinceStart() + 1, 3)}`;
-}
+// ---------------- Daily Reset ----------------
+function checkForNewDay() {
+  const today = daysSinceStart();
+  const last = parseInt(localStorage.getItem(LAST_DATE_KEY) || '-1', 10);
 
-btnEl.addEventListener('click', handleGuess);
-inputEl.addEventListener('keydown', e => e.key === 'Enter' && handleGuess());
+  if (today !== last) {
+    attempts = [];
+    localStorage.setItem(ATTEMPTS_KEY, '[]');
+    localStorage.setItem(LAST_DATE_KEY, today.toString());
+    target = getBossOfTheDay();
+    gameOver = false;
+    initializeGame();
+  }
+}
 
 function startDailyCheck() {
   setInterval(checkForNewDay, 60000);
 }
+
+// ---------------- Label ----------------
+function updateBossdleDayLabel() {
+  bossdleDayEl.textContent = `Bossdle: ${pad(daysSinceStart() + 1, 3)}`;
+}
+
+// ---------------- Events ----------------
+btnEl.addEventListener('click', handleGuess);
+inputEl.addEventListener('keydown', e => e.key === 'Enter' && handleGuess());
